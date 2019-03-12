@@ -36,7 +36,7 @@ class DataHelper(object):
         negative_examples = [s.strip() for s in negative_examples]
         # Split by words
         x_text = positive_examples + negative_examples
-        x_text = [clean_str(sent) for sent in x_text]
+        x_text = [self.clean_str(sent) for sent in x_text]
         # Generate labels
         positive_labels = [[0, 1] for _ in positive_examples]
         negative_labels = [[1, 0] for _ in negative_examples]
