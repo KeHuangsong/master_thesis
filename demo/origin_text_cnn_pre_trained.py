@@ -7,7 +7,7 @@ class TextCNN(object):
     A CNN for text classification.
     Uses an embedding layer, followed by a convolutional, max_pooling and softmax layer.
     """
-    def __init__(self, batch_size, num_classes, embedding_size, w2v, l2_reg_lambda=0.0):
+    def __init__(self, batch_size, num_classes, embedding_size, w2v, resize_n=300, l2_reg_lambda=0.0):
         # Placeholders for input, output and dropout
         self.input_x = tf.placeholder(tf.int32, [None, 1], name="input_x")
         self.input_y = tf.placeholder(tf.float32, [batch_size, num_classes], name="input_y")
