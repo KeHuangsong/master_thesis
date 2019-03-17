@@ -14,33 +14,24 @@ class TextCNN(object):
         self.len_x = tf.placeholder(tf.int32, [batch_size])
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
 
-        # Keeping track of l2 regularization loss (optional)
         l2_loss = tf.constant(0.0)
 
-        # split input
         BS = tf.split(self.input_x, self.len_x, num=batch_size)
 
-        # Embedding vector
         self.W = tf.Variable(w2v, name="W")
         # self.W = tf.constant(w2v, name="W")
         # self.W = tf.Variable(tf.random_uniform(list(w2v.shape), -1.0, 1.0), name="W")
 
-        # deal with every sentences
+        resized_images = []
         for i in range(batch_size):
-            
-            # Embedding layer
             bs = tf.reshape(BS[i], [1, -1])
-            self.embedded_chars = tf.nn.embedding_lookup(self.W, bs)
-            self.embedded_chars_expanded = tf.expand_dims(self.embedded_chars, -1)
-            if i == 0:
-                self.resized_embedded_chars_expanded = tf.image.resize_images(self.embedded_chars_expanded,
-                                         [resize_n, embedding_size], method=tf.image.ResizeMethod.BILINEAR)
-            else:
-                em = tf.image.resize_images(self.embedded_chars_expanded,
-                                         [resize_n, embedding_size], method=tf.image.ResizeMethod.BILINEAR)
-                # BILINEAR  NEAREST_NEIGHBOR  BICUBIC  AREA
-                self.resized_embedded_chars_expanded = tf.concat(
-                                         [self.resized_embedded_chars_expanded, em], 0)
+            embedded_chars = tf.nn.embedding_lookup(self.W, bs)
+            embedded_chars_expanded = tf.expand_dims(embedded_chars, -1)
+            em = tf.image.resize_images(embedded_chars_expanded,
+                                        [resize_n, embedding_size], method=tf.image.ResizeMethod.BILINEAR)
+            # BILINEAR  NEAREST_NEIGHBOR  BICUBIC  AREA
+            resized_images.append(em)
+        resized_embedded_chars_expanded = tf.concat(resized_images, 0)
 
         '''
         batch_mean, batch_var = tf.nn.moments(self.resized_embedded_chars_expanded, [0, 1, 2], keep_dims=True)
@@ -51,44 +42,23 @@ class TextCNN(object):
                                              batch_mean, batch_var, shift, scale, epsilon)
         '''
 
-        filter_shape1 = [5, 300, 1, 50]
-        w1 = tf.Variable(tf.truncated_normal(filter_shape1, stddev=0.1), name="W1")
+        hs = []
+        for filter_size in [5, 10, 20]:
+            filter_shape1 = [filter_size, 300, 1, 50]
+            w = tf.Variable(tf.truncated_normal(filter_shape1, stddev=0.1), name="w")
+            conv = tf.nn.conv2d(
+                resized_embedded_chars_expanded,
+                w,
+                strides=[1, filter_size, 1, 1],
+                padding="VALID",
+                name="conv")
+            hs.append(tf.reshape(conv, [batch_size, -1]))
 
-        conv1 = tf.nn.conv2d(
-            self.resized_embedded_chars_expanded,
-            w1,
-            strides=[1, 5, 1, 1],
-            padding="VALID",
-            name="conv1")
-        h1 = tf.reshape(conv1, [batch_size, -1])
-
-        filter_shape2 = [10, 300, 1, 50]
-        w2 = tf.Variable(tf.truncated_normal(filter_shape2, stddev=0.1), name="W3")
-
-        conv2 = tf.nn.conv2d(
-            self.resized_embedded_chars_expanded,
-            w2,
-            strides=[1, 10, 1, 1],
-            padding="VALID",
-            name="conv2")
-        h2 = tf.reshape(conv2, [batch_size, -1])
-
-        filter_shape3 = [20, 300, 1, 50]
-        w3 = tf.Variable(tf.truncated_normal(filter_shape3, stddev=0.1), name="W3")
-
-        conv3 = tf.nn.conv2d(
-            self.resized_embedded_chars_expanded,
-            w3,
-            strides=[1, 20, 1, 1],
-            padding="VALID",
-            name="conv3")
-        h3 = tf.reshape(conv3, [batch_size, -1])
-
-        h = tf.concat([h1, h2, h3], 1)
+        h_concat = tf.concat(hs, 1)
 
         # Add dropout
         with tf.name_scope("dropout"):
-            self.h_drop = tf.nn.dropout(h, self.dropout_keep_prob)
+            self.h_drop = tf.nn.dropout(h_concat, self.dropout_keep_prob)
 
         w = tf.get_variable(
             "w",
