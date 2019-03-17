@@ -50,7 +50,6 @@ class ModelTrain(DataHelper):
 
         x = np.array(x)
         self.default_w2v = np.array(default_w2v)
-
         shuffle_indices = np.random.permutation(np.arange(len(y)))
         x_shuffled = x[shuffle_indices]
         y_shuffled = y[shuffle_indices]
@@ -174,7 +173,7 @@ if __name__ == '__main__':
     positive_data_file = "./data/data.pos"
     negative_data_file = "./data/data.neg"
     resize_n = 100
-    dropout_keep_prob = 0.01
+    dropout_keep_prob = 0.5
     l2_reg_lambda = 5
     batch_size = 50
     num_epochs = 200
