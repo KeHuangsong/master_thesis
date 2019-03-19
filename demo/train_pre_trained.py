@@ -3,7 +3,7 @@
 import tensorflow as tf
 import numpy as np
 from data_helpers import DataHelper
-from resized_text_cnn_pre_trained import TextCNN
+# from resized_text_cnn_pre_trained import TextCNN
 from origin_text_cnn_pre_trained import TextCNN
 import matplotlib
 matplotlib.use('Agg')
@@ -32,10 +32,12 @@ class ModelTrain(DataHelper):
         print("Loading data...")
         x_text, y = self.load_data_and_labels(self.positive_data_file, self.negative_data_file)
 
+        # y = [y[i] for i in range(len(y)) if len(x_text[i]) >= 5]
+        # x_text = [v for v in x_text if len(v) >= 5]
+
         vocabulary = {}
         for text in x_text:
-            words = text.split(" ")
-            for word in words:
+            for word in text:
                 if word not in vocabulary:
                     vocabulary[word] = len(vocabulary)
 
@@ -46,10 +48,10 @@ class ModelTrain(DataHelper):
 
         x = []
         for text in x_text:
-            words = text.split(" ")
-            x.append([vocabulary[n] for n in words])
+            x.append([vocabulary[n] for n in text])
 
         x = np.array(x)
+        y = np.array(y)
         self.default_w2v = np.array(default_w2v)
         shuffle_indices = np.random.permutation(np.arange(len(y)))
         x_shuffled = x[shuffle_indices]
