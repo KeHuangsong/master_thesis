@@ -3,8 +3,9 @@
 import tensorflow as tf
 import numpy as np
 from data_helpers import DataHelper
+# from origin_text_cnn_pre_trained import TextCNN
 # from resized_text_cnn_pre_trained import TextCNN
-from origin_text_cnn_pre_trained import TextCNN
+from ssp_text_cnn_pre_trained import TextCNN
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
