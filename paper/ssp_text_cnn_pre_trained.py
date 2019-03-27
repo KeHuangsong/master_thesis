@@ -22,8 +22,8 @@ class TextCNN(object):
         self.W = tf.Variable(tf.random_uniform(list(w2v.shape), -1.0, 1.0), name="W")
 
         pooled_outputs = []
-        num_filters = 50
-        filter_sizes = [3, 4, 5]
+        num_filters = 100
+        filter_sizes = [2, 3, 4, 5]
         ssp_sizes = [1, 2, 3]
         for filter_size in filter_sizes:
             with tf.name_scope("ssp-%s" % filter_size):
@@ -73,7 +73,6 @@ class TextCNN(object):
             l2_loss += tf.nn.l2_loss(w)
             l2_loss += tf.nn.l2_loss(b)
 
-            # self.scores = tf.nn.relu(tf.nn.xw_plus_b(self.h_drop, w, b, name="scores"))
             self.scores = tf.nn.xw_plus_b(self.h_drop, w, b, name="scores")
 
         with tf.name_scope("loss"):

@@ -17,9 +17,9 @@ class TextCNN(object):
 
         BS = tf.split(self.input_x, self.len_x, num=batch_size)
 
-        # self.W = tf.Variable(w2v, name="W")
+        self.W = tf.Variable(w2v, name="W")
         # self.W = tf.constant(w2v, name="W")
-        self.W = tf.Variable(tf.random_uniform(list(w2v.shape), -1.0, 1.0), name="W")
+        # self.W = tf.Variable(tf.random_uniform(list(w2v.shape), -1.0, 1.0), name="W")
 
         resized_images = []
         for i in range(batch_size):
@@ -33,18 +33,9 @@ class TextCNN(object):
                 resized_images.append(em)
         resized_embedded_chars_expanded = tf.concat(resized_images, 0)
 
-        '''
-        batch_mean, batch_var = tf.nn.moments(self.resized_embedded_chars_expanded, [0, 1, 2], keep_dims=True)
-        shift = tf.Variable(tf.zeros([1]))
-        scale = tf.Variable(tf.ones([1]))
-        epsilon = 1e-3
-        self.resized_embedded_chars_expanded = tf.nn.batch_normalization(self.resized_embedded_chars_expanded,
-                                             batch_mean, batch_var, shift, scale, epsilon)
-        '''
-
         pooled_outputs = []
         num_filters = 50
-        filter_sizes = [5, 10, 25]
+        filter_sizes = [10, 20, 25, 50]
         for filter_size in filter_sizes:
             with tf.name_scope("conv-%s" % filter_size):
                 filter_shape = [filter_size, embedding_size, 1, num_filters]

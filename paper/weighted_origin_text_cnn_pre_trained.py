@@ -20,6 +20,12 @@ class TextCNN(object):
         self.W = tf.Variable(w2v, name="W")
         # self.W = tf.constant(w2v, name="W")
         # self.W = tf.Variable(tf.random_uniform(list(w2v.shape), -1.0, 1.0), name="W")
+        position_weight_split = 10
+        self.position_weight = tf.Variable(tf.random_uniform([position_weight_split, 1], 1.0, 1.0),
+                                           name="position_weight")
+        l2_loss += tf.nn.l2_loss(self.position_weight-tf.ones([position_weight_split, 1]))
+        self.word_weight = tf.Variable(tf.random_uniform([list(w2v.shape)[0], 1], 1.0, 1.0), name="position_weight")
+        l2_loss += tf.nn.l2_loss(self.position_weight - tf.ones([position_weight_split, 1]))
 
         resized_images = []
         for i in range(batch_size):
@@ -34,6 +40,9 @@ class TextCNN(object):
 
         pooled_outputs = []
         num_filters = 100
+        divider = tf.expand_dims(self.len_x, 1)
+        divider = tf.expand_dims(divider, 2)
+        divider = tf.concat([divider for _ in range(num_filters)], 2)
         filter_sizes = [2, 3, 4, 5]
         for filter_size in filter_sizes:
             with tf.name_scope("conv-maxpool-%s" % filter_size):
@@ -48,7 +57,25 @@ class TextCNN(object):
                     name="conv")
                 h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
                 pooled = tf.reduce_max(h, [1])
-                pooled_outputs.append(pooled)
+                max_condition = tf.argmax(h, 1)
+                split_max_condition = tf.unstack(max_condition, axis=0)
+                word_weight = []
+                for i in range(batch_size):
+                    pool_max_conditions = tf.concat([split_max_condition[i]+i for i in range(filter_size)], 0)
+                    pool_max_conditions = tf.clip_by_value(tf.cast(pool_max_conditions, tf.int32), 0,
+                                                           tf.slice(self.len_x, [i], [1]) - 1)
+                    max_word = tf.nn.embedding_lookup(BS[i], pool_max_conditions)
+                    batch_word_w = tf.reduce_mean(tf.nn.embedding_lookup(self.word_weight, max_word), [0, 2, 3])
+                    word_weight.append(tf.expand_dims(tf.expand_dims(batch_word_w, 0), 0))
+                self.word_w = tf.concat(word_weight, 0)
+                self.max_condition = tf.rint(tf.cast(max_condition, tf.float32)/tf.cast(divider, tf.float32) * position_weight_split)
+                self.max_condition = tf.cast(tf.clip_by_value(self.max_condition, 0, position_weight_split-1), tf.int32)
+                self.position_w = tf.reduce_max(tf.nn.embedding_lookup(self.position_weight, self.max_condition), 3)
+                self.weight = tf.multiply(self.position_w, self.word_w)
+                print self.position_w
+                print self.word_w
+                print self.weight
+                pooled_outputs.append(tf.multiply(pooled, self.weight))
 
         self.h_concat = tf.concat(pooled_outputs, 2)
         self.h_pool_flat = tf.reshape(self.h_concat, [-1, num_filters * len(filter_sizes)])

@@ -1,24 +1,17 @@
 #! /usr/bin/env python
 
 import os
-import sys
 import argparse
 import gensim
 import tensorflow as tf
 import numpy as np
 from data_helpers import DataHelper
-from get_data import GetData
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
-def my_print(file_name, text):
-    with open(file_name, 'a') as f:
-        f.write('%s\n' % text)
-
-
-class ModelTrain(DataHelper, GetData):
+class ModelTrain(DataHelper):
     def __init__(self, dev_sample_percentage, data_file, dropout_keep_prob,
                  batch_size, num_epochs, evaluate_every, checkpoint_every, num_checkpoints, allow_soft_placement,
                  log_device_placement, resize_n, l2_reg_lambda):
@@ -35,11 +28,11 @@ class ModelTrain(DataHelper, GetData):
         self.allow_soft_placement = allow_soft_placement
         self.log_device_placement = log_device_placement
 
-    def get_data(self, out_file):
-        my_print(out_file, "Loading data...")
+    def get_data(self):
+        print("Loading data...")
         if not os.path.exists(self.data_file):
-            my_print(out_file, "start get data from hive...")
-            self.get_title_data(days=7, data_size=3000000, category_num=20)
+            print("start get data from hive...")
+            self.get_title_data(days=15, data_size=1000, category_num=20)
 
         train_data_path = './data/train_data.npy'
         if os.path.exists(train_data_path):
@@ -85,16 +78,16 @@ class ModelTrain(DataHelper, GetData):
             self.y_train, self.y_dev = y_shuffled[:dev_sample_index], y_shuffled[dev_sample_index:]
             self.len_train = [len(v) for v in self.x_train]
             self.len_dev = [len(v) for v in self.x_dev]
-            train_data = dict(default_w2v = self.default_w2v,
-                              x_train = self.x_train,
-                              x_dev = self.x_dev,
-                              y_train = self.y_train,
-                              y_dev = self.y_dev,
-                              len_train = self.len_train,
-                              len_dev = self.len_dev)
+            train_data = dict(default_w2v=self.default_w2v,
+                              x_train=self.x_train,
+                              x_dev=self.x_dev,
+                              y_train=self.y_train,
+                              y_dev=self.y_dev,
+                              len_train=self.len_train,
+                              len_dev=self.len_dev)
             np.save(train_data_path, train_data)
-            my_print(out_file, "Vocabulary Size: {:d}".format(len(vocabulary)))
-        my_print(out_file, "Train/Dev split: {:d}/{:d}".format(len(self.y_train), len(self.y_dev)))
+            print("Vocabulary Size: {:d}".format(len(vocabulary)))
+        print("Train/Dev split: {:d}/{:d}".format(len(self.y_train), len(self.y_dev)))
 
     def train_step(self, sess, cnn, lr, train_op, x_batch, y_batch, len_batch, lrate):
         """
@@ -124,6 +117,7 @@ class ModelTrain(DataHelper, GetData):
         loss, accuracy = sess.run(
             [cnn.loss, cnn.accuracy],
             feed_dict)
+
         return (loss, accuracy)
 
     def my_plot(self, loss_list1, loss_list2):
@@ -134,19 +128,7 @@ class ModelTrain(DataHelper, GetData):
         plt.draw()
         plt.pause(0.0001)
 
-    def train(self, model, out_file):
-        if model == 'origin':
-            from origin_text_cnn_pre_trained import TextCNN
-        if model == 'weighted_origin':
-            from weighted_origin_text_cnn_pre_trained import TextCNN
-        if model == 'origin_pro':
-            from origin_condition_text_cnn_pre_trained import TextCNN
-        elif model == 'resized':
-            from resized_text_cnn_pre_trained import TextCNN
-        elif model == 'both':
-            from both_text_cnn_pre_trained import TextCNN
-        elif model == 'ssp':
-            from ssp_text_cnn_pre_trained import TextCNN
+    def train(self):
         with tf.Graph().as_default():
             session_conf = tf.ConfigProto(
                     allow_soft_placement=self.allow_soft_placement,
@@ -181,10 +163,23 @@ class ModelTrain(DataHelper, GetData):
                 dev_accu = []
                 turn = 0
                 for x_batch, y_batch, len_batch in batches:
-                    _lr = 0.0001+(0.001-0.0001)*np.exp(-i/2000)
+                    _lr = 0.001#+(0.001-0.0001)*np.exp(-i/2000)
                     self.train_step(sess, cnn, lr, train_op, x_batch, y_batch, len_batch, _lr)
                     current_step = tf.train.global_step(sess, global_step)
                     if current_step % self.evaluate_every == 0:
+                        if 1:
+                            feed_dict = {
+                                cnn.input_x: x_batch,
+                                cnn.input_y: y_batch,
+                                cnn.len_x: len_batch,
+                                cnn.dropout_keep_prob: 1.0
+                            }
+                            argmax, position_weight, position_w = sess.run(
+                                [cnn.max_condition, cnn.position_weight, cnn.position_w],
+                                feed_dict)
+                            print [list(v) for v in argmax[:1]]
+                            print [v[0] for v in position_weight]
+                            print [list(v) for v in position_w[:1]]
                         dev_batches = self.batch_iter(
                                   self.x_dev, self.y_dev, self.len_dev, self.batch_size, 1)
                         train_batches = self.batch_iter(
@@ -192,7 +187,7 @@ class ModelTrain(DataHelper, GetData):
                         dev_pre = []
                         train_pre = []
                         turn += 1
-                        my_print(out_file, "\nEvaluation: %s" % turn)
+                        print("\nEvaluation: %s" % turn)
                         for x_dev_batch, y_dev_batch, len_dev_batch in dev_batches:
                             dev_loss, dev_accuracy = self.dev_step(cnn, sess, x_dev_batch, y_dev_batch, len_dev_batch)
                             dev_pre.append(dev_accuracy)
@@ -200,19 +195,17 @@ class ModelTrain(DataHelper, GetData):
                             train_loss, train_accuracy = self.dev_step(cnn, sess, x_train_batch, y_train_batch,
                                                                        len_train_batch)
                             train_pre.append(train_accuracy)
-                        my_print(out_file, 'train accuray: '+str(sum(train_pre)/len(train_pre)))
-                        my_print(out_file, 'test accuray: '+str(sum(dev_pre)/len(dev_pre)))
+                        print('train accuray: '+str(sum(train_pre)/len(train_pre)))
+                        print('test accuray: '+str(sum(dev_pre)/len(dev_pre)))
                         dev_accu.append(sum(dev_pre)/len(dev_pre))
                         train_accu.append(sum(train_pre)/len(train_pre))
                         self.my_plot(train_accu, dev_accu)
                 plt.ioff()
                 plt.show()
 
-    def start(self, model, out_file):
-        # out_file = open(outfile, "a")
-        # sys.stdout = out_file
-        self.get_data(out_file)
-        self.train(model, out_file)
+    def start(self):
+        self.get_data()
+        self.train()
 
 
 if __name__ == '__main__':
@@ -220,9 +213,21 @@ if __name__ == '__main__':
     parser.add_argument('-model', type=str, default='origin')
     parser.add_argument('-dropout_keep_prob', type=float, default=0.5)
     parser.add_argument('-l2_reg_lambda', type=float, default=0)
-    parser.add_argument('-batch_size', type=int, default=60)
+    parser.add_argument('-batch_size', type=int, default=100)
     parser.add_argument('-refresh_data', type=bool, default=False)
     args = parser.parse_args()
+    if args.model == 'origin':
+        from origin_text_cnn_pre_trained import TextCNN
+    if args.model == 'weighted_origin':
+        from weighted_origin_text_cnn_pre_trained import TextCNN
+    if args.model == 'origin_pro':
+        from origin_condition_text_cnn_pre_trained import TextCNN
+    elif args.model == 'resized':
+        from resized_text_cnn_pre_trained import TextCNN
+    elif args.model == 'both':
+        from both_text_cnn_pre_trained import TextCNN
+    elif args.model == 'ssp':
+        from ssp_text_cnn_pre_trained import TextCNN
     if args.refresh_data:
         os.system('rm -r ./data')
     if not os.path.exists('./data'):
@@ -230,7 +235,7 @@ if __name__ == '__main__':
     print args
     data_file = "./data/raw_title_data.txt"
     dev_sample_percentage = 0.1
-    resize_n = 100
+    resize_n = 60
     dropout_keep_prob = args.dropout_keep_prob
     l2_reg_lambda = args.l2_reg_lambda
     batch_size = args.batch_size
@@ -243,5 +248,5 @@ if __name__ == '__main__':
     model_train = ModelTrain(dev_sample_percentage, data_file, dropout_keep_prob,
                  batch_size, num_epochs, evaluate_every, checkpoint_every, num_checkpoints, allow_soft_placement,
                  log_device_placement, resize_n, l2_reg_lambda)
-    model_train.start(args.model)
+    model_train.start()
 
